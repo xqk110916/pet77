@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>菜单</title>
+    <link rel="stylesheet" href="/src/menu.css" />
+  </head>
+  <body>
+    <div id="menu-panel">
+      <div id="main-list">
+        <div class="menu-item" data-action="feed">🍗 喂食</div>
+        <div class="menu-item" data-action="play">🎾 玩耍</div>
+        <div class="menu-item" data-action="sleep">😴 睡觉</div>
+        <div class="menu-item" data-action="chat">💬 和我聊天</div>
+        <div class="menu-sep"></div>
+        <div class="menu-item" data-action="toggle-stats"><span class="chk" id="chk-stats">◻</span> 状态栏</div>
+        <div class="menu-item" data-action="toggle-autostart"><span class="chk" id="chk-autostart">◻</span> 开机自启</div>
+        <div class="menu-item" data-action="scale-up">🔍＋ 放大</div>
+        <div class="menu-item" data-action="scale-down">🔍－ 缩小</div>
+        <div id="anim-entry" class="menu-item">🎬 动作演示 <span class="arrow">▸</span></div>
+        <div class="menu-sep"></div>
+        <div class="menu-item danger" data-action="exit">⏻ 退出</div>
+      </div>
+      <div id="flyout"></div>
+    </div>
+    <script type="module" src="/src/menu.js"></script>
+  </body>
+</html>

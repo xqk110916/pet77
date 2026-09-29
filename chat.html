@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>和77聊天</title>
+    <link rel="stylesheet" href="/src/chat.css" />
+  </head>
+  <body>
+    <div id="chat-panel">
+      <header data-tauri-drag-region>
+        <span class="avatar" data-tauri-drag-region>🐱</span>
+        <div class="who" data-tauri-drag-region><b>77</b><i>● 在线</i></div>
+        <button id="clear" title="清空聊天记录">🗑</button>
+        <button id="close" title="关闭 (Esc)">✕</button>
+      </header>
+      <div id="msgs"></div>
+      <footer>
+        <textarea id="input" rows="1" placeholder="和77说点什么…（试试：30分钟后提醒我喝水）"></textarea>
+        <button id="send">发送</button>
+      </footer>
+    </div>
+    <script type="module" src="/src/chat.js"></script>
+  </body>
+</html>

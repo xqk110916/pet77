@@ -1,0 +1,50 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background: transparent;
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#wrap {
+  padding: 0 12px 12px 12px; /* 底部留出气泡尾巴的空间 */
+}
+
+#bubble-box {
+  display: inline-block;
+  max-width: 300px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  color: #333;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  position: relative;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.18s, transform 0.18s;
+}
+
+#bubble-box.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 气泡尾巴（指向下方的猫） */
+#bubble-box::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: rgba(255, 255, 255, 0.96);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transform: rotate(45deg);
+}

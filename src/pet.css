@@ -1,0 +1,77 @@
+:root { --scale: 0.5; }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+#pet {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: calc(192px * var(--scale));
+  height: calc(208px * var(--scale));
+  background-image: url('/src/assets/spritesheet.webp');
+  background-repeat: no-repeat;
+  background-size: calc(1536px * var(--scale)) calc(1872px * var(--scale));
+  background-position: calc(0px - var(--col, 0) * 192px * var(--scale)) calc(0px - var(--row, 0) * 208px * var(--scale));
+  cursor: grab;
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.25));
+}
+#pet.grabbing { cursor: grabbing; }
+
+#food {
+  position: absolute;
+  right: calc(12px * var(--scale));
+  bottom: calc(9px * var(--scale));
+  font-size: calc(28px * var(--scale));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.3));
+}
+#food.show { opacity: 1; }
+
+#ball {
+  position: absolute;
+  left: calc(16px * var(--scale));
+  bottom: calc(20px * var(--scale));
+  font-size: calc(24px * var(--scale));
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.3));
+}
+#ball.bounce {
+  opacity: 1;
+  animation: ball-bounce calc(1.6s * var(--scale)) ease-in-out;
+}
+@keyframes ball-bounce {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(calc(-70px * var(--scale))) scale(1); }
+  55%  { transform: translateY(0) scale(1.15, 0.8); }
+  75%  { transform: translateY(calc(-26px * var(--scale))) scale(1); }
+  100% { transform: translateY(0) scale(1); opacity: 0; }
+}
+
+/* ---- 交互提示粒子（摸头爱心等） ---- */
+.fx {
+  position: absolute;
+  pointer-events: none;
+  font-size: calc(15px * var(--scale) + 4px);
+  opacity: 0;
+}
+.fx.float {
+  animation: fx-float 1.2s ease-out;
+}
+@keyframes fx-float {
+  0%   { opacity: 0; transform: translateY(0) scale(0.5); }
+  20%  { opacity: 1; transform: translateY(-12px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-56px) scale(1); }
+}
