@@ -9,7 +9,10 @@ const panel = document.getElementById('menu-panel');
 const animEntry = document.getElementById('anim-entry');
 const flyout = document.getElementById('flyout');
 
+const ON_MAIN_MENU = new Set(['sleepLie', 'belly', 'stretch', 'tailChase', 'drink']);
+
 for (const [key, def] of Object.entries(ANIMS)) {
+  if (ON_MAIN_MENU.has(key)) continue;
   const el = document.createElement('div');
   el.className = 'menu-item sub';
   el.textContent = def.label;
@@ -20,9 +23,8 @@ for (const [key, def] of Object.entries(ANIMS)) {
 let flyoutOpen = false;
 
 async function resizeToContent() {
-  const rect = panel.getBoundingClientRect();
-  const w = Math.ceil(rect.width) + 10;
-  const h = Math.ceil(rect.height) + 10;
+  const w = Math.ceil(Math.max(panel.scrollWidth, panel.offsetWidth)) + 16;
+  const h = Math.ceil(Math.max(panel.scrollHeight, panel.offsetHeight)) + 16;
   try { await win.setSize(new LogicalSize(w, h)); } catch { /* ignore */ }
 }
 

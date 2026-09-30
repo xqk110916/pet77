@@ -1,6 +1,7 @@
 {
-  "id": "77",
-  "displayName": "77",
-  "description": "A compact gray-and-white round-faced cat based on the user pet photos.",
+  "id": "sanhua",
+  "displayName": "三花",
+  "description": "A chibi calico cat in a blue knitted bunny-ear hat, sitting with a carrot plush and a plain tissue box.",
+  "spriteVersionNumber": 2,
   "spritesheetPath": "spritesheet.webp"
 }

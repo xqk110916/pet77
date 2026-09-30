@@ -1,4 +1,8 @@
-:root { --scale: 0.5; }
+:root {
+  --scale: 0.5;
+  --guess-side: 44px;
+  --guess-below: 102px;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,21 +18,37 @@ html, body, #app {
 
 #pet {
   position: absolute;
+  z-index: 2;
   left: 0;
   bottom: 0;
   width: calc(192px * var(--scale));
   height: calc(208px * var(--scale));
-  background-image: url('/src/assets/spritesheet.webp');
+  background-image: url('/src/assets/spritesheet.webp?v=4');
   background-repeat: no-repeat;
-  background-size: calc(1536px * var(--scale)) calc(1872px * var(--scale));
+  background-size: calc(1536px * var(--scale)) calc(3328px * var(--scale));
   background-position: calc(0px - var(--col, 0) * 192px * var(--scale)) calc(0px - var(--row, 0) * 208px * var(--scale));
   cursor: grab;
   filter: drop-shadow(0 6px 8px rgba(0,0,0,0.25));
 }
 #pet.grabbing { cursor: grabbing; }
+html.guessing #pet {
+  left: calc(var(--guess-side) * var(--scale));
+  bottom: calc(var(--guess-below) * var(--scale));
+}
+#pet.guess-sit,
+#pet.guess-paw-carrot,
+#pet.guess-paw-tissue {
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center;
+}
+#pet.guess-sit { background-image: url('/src/assets/guess-sit.png'); }
+#pet.guess-paw-carrot { background-image: url('/src/assets/guess-paw-carrot.png'); }
+#pet.guess-paw-tissue { background-image: url('/src/assets/guess-paw-tissue.png'); }
 
 #food {
   position: absolute;
+  z-index: 4;
   right: calc(12px * var(--scale));
   bottom: calc(9px * var(--scale));
   font-size: calc(28px * var(--scale));
@@ -41,6 +61,7 @@ html, body, #app {
 
 #ball {
   position: absolute;
+  z-index: 4;
   left: calc(16px * var(--scale));
   bottom: calc(20px * var(--scale));
   font-size: calc(24px * var(--scale));
@@ -60,6 +81,41 @@ html, body, #app {
   100% { transform: translateY(0) scale(1); opacity: 0; }
 }
 
+#guess {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  pointer-events: none;
+}
+#guess.show { display: block; }
+#guess button {
+  position: absolute;
+  bottom: 0;
+  width: calc(120px * var(--scale));
+  height: calc(120px * var(--scale));
+  padding: 0;
+  border: 0;
+  background: none;
+  pointer-events: auto;
+}
+#guess button svg { width: 100%; height: 100%; display: block; }
+#guess-tissue { left: calc(8px * var(--scale)); }
+#guess-carrot { right: calc(8px * var(--scale)); }
+#guess.show button { animation: prop-drop 0.42s ease-out both; }
+#guess.show #guess-carrot { animation-delay: 0.07s; }
+#guess.show button.picked { animation: prop-tap 0.5s ease-out; }
+#guess.locked button { pointer-events: none; }
+@keyframes prop-drop {
+  0% { opacity: 0; transform: translateY(calc(var(--guess-below) * var(--scale) * -1)); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes prop-tap {
+  0% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(calc(4px * var(--scale))) scale(0.9, 0.82); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 /* ---- 交互提示粒子（摸头爱心等） ---- */
 .fx {
   position: absolute;
@@ -69,6 +125,11 @@ html, body, #app {
 }
 .fx.float {
   animation: fx-float 1.2s ease-out;
+}
+.fx.heart {
+  z-index: 6;
+  color: #ff4d6d;
+  font-size: calc(28px * var(--scale) + 8px);
 }
 @keyframes fx-float {
   0%   { opacity: 0; transform: translateY(0) scale(0.5); }

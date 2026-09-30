@@ -11,6 +11,9 @@ const win = getCurrentWindow();
 const petEl = document.getElementById('pet');
 const foodEl = document.getElementById('food');
 const ballEl = document.getElementById('ball');
+const guessLayer = document.getElementById('guess');
+const guessCarrot = document.getElementById('guess-carrot');
+const guessTissue = document.getElementById('guess-tissue');
 
 // 诊断：JS 错误转发到 Rust 终端
 window.addEventListener('error', (e) => {
@@ -114,7 +117,7 @@ function animStep(dt) {
 }
 
 // ---------------- 行为状态机 ----------------
-let mode = 'boot'; // ai | walk | sleep | eating | playing | dragging | demo
+let mode = 'boot'; // ai | walk | sleep | eating | playing | dragging | demo | guessing
 let walkTarget = null;
 let walkSpeed = 44;
 let aiTimer = null;
@@ -172,15 +175,16 @@ function walkStep(dt) {
 }
 
 function startSleep(auto) {
+  if (mode === 'guessing') abortGuess();
   mode = 'sleep';
-  setAnim('doze');
+  setAnim('sleepLie');
   bubble(auto ? '累了…先睡会儿 Zzz' : '晚安 Zzz', 3000);
 }
 
 function wake() {
   if (mode !== 'sleep') return;
   mode = 'ai';
-  setAnim('sitWatch', 1, () => scheduleAI(600));
+  setAnim('stretch', 1, () => scheduleAI(600));
   bubble('睡醒啦~');
 }
 
@@ -189,7 +193,23 @@ let press = null;
 
 petEl.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  press = { t: performance.now(), sx: e.screenX, sy: e.screenY, dragging: false, timer: null };
+  if (mode === 'guessing') {
+    if (!guessRound || guessRound.busy) return;
+    const rect = petEl.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    commitGuess(x < 0.5 ? 'tissue' : 'carrot');
+    return;
+  }
+  const rect = petEl.getBoundingClientRect();
+  press = {
+    t: performance.now(),
+    sx: e.screenX,
+    sy: e.screenY,
+    dragging: false,
+    timer: null,
+    xRatio: rect.width ? (e.clientX - rect.left) / rect.width : 0.5,
+    yRatio: rect.height ? (e.clientY - rect.top) / rect.height : 1,
+  };
   press.timer = setTimeout(startDrag, 170);
 });
 
@@ -213,6 +233,7 @@ document.addEventListener('pointerup', () => {
 
 async function startDrag() {
   if (!press || press.dragging) return;
+  if (mode === 'guessing') abortGuess();
   press.dragging = true;
   dragStartPos = { x: pos.x, y: pos.y };
   clearTimeout(aiTimer);
@@ -273,20 +294,37 @@ const PET_WORDS = ['喵~', '咕噜咕噜…', '喵♥', '摸摸头…', '好舒�
 
 function onPetClick() {
   if (mode === 'sleep') { wake(); return; }
+  if (mode === 'guessing') return;
+  if (anim.def === ANIMS.belly) {
+    spawnFx('♥', PET_W / 2, PET_H * 0.35);
+    gs.mood = Math.min(100, gs.mood + 4);
+    gainXp(2);
+    bubble('咕噜咕噜…再摸摸');
+    saveSoon();
+    return;
+  }
   if (mode === 'eating' || mode === 'playing' || mode === 'dragging') return;
   clearTimeout(aiTimer);
   mode = 'ai';
-  setAnim('alert', 1, () => scheduleAI(700));
-  spawnFx('♥', PET_W / 2, PET_H * 0.25);
+  const onBody = (press?.yRatio ?? 1) >= 0.5;
+  if (onBody) {
+    setAnim('sitWatch', 1, () => scheduleAI(700));
+    spawnFx('♥', PET_W * (press?.xRatio ?? 0.5), PET_H * Math.min(press?.yRatio ?? 0.7, 0.82), 'heart');
+    bubble('爱你，小咪');
+  } else {
+    setAnim('alert', 1, () => scheduleAI(700));
+    spawnFx('♥', PET_W / 2, PET_H * 0.25);
+    bubble(PET_WORDS[(Math.random() * PET_WORDS.length) | 0]);
+  }
   gs.mood = Math.min(100, gs.mood + 3);
   gainXp(2);
-  bubble(PET_WORDS[(Math.random() * PET_WORDS.length) | 0]);
   saveSoon();
 }
 
 petEl.addEventListener('dblclick', () => doPlay());
 
 function doFeed() {
+  if (mode === 'guessing') abortGuess();
   if (mode === 'eating' || mode === 'playing') return;
   if (cooldown.feed > Date.now()) return bubble('还没饿呢喵');
   if (gs.hunger > 95) return bubble('吃不下了喵…');
@@ -309,6 +347,7 @@ function doFeed() {
 }
 
 function doPlay() {
+  if (mode === 'guessing') abortGuess();
   if (mode === 'eating' || mode === 'playing' || mode === 'dragging') return;
   if (gs.energy < 15) {
     bubble('累了…不想动喵');
@@ -330,6 +369,162 @@ function doPlay() {
   });
 }
 
+// ---------------- 猜萝卜 / 猜纸巾 ----------------
+// 道具落到脚底下，窗口向两侧和向下撑开，避免挡住全身。
+const GUESS_SIDE = 44;
+const GUESS_BELOW = 102;
+let guessRound = null;
+let guessTimer = null;
+let guessLayout = null;
+let guessLayoutGen = 0;
+
+function petScreenOrigin() {
+  if (document.documentElement.classList.contains('guessing')) {
+    return { x: pos.x + GUESS_SIDE * scale, y: pos.y };
+  }
+  return { x: pos.x, y: pos.y };
+}
+
+async function layoutGuessWindow(expand) {
+  const gen = ++guessLayoutGen;
+  const side = GUESS_SIDE * scale;
+  const below = GUESS_BELOW * scale;
+  if (expand) {
+    if (!guessLayout) {
+      await syncPosFromWindow();
+      if (gen !== guessLayoutGen) return;
+      guessLayout = { x: pos.x, y: pos.y };
+    }
+    document.documentElement.classList.add('guessing');
+    const winW = Math.round(PET_W + side * 2);
+    const winH = Math.round(PET_H + below);
+    let x = guessLayout.x - side;
+    let y = guessLayout.y;
+    const minX = wa.x / dpiScale;
+    const minY = wa.y / dpiScale;
+    const maxX = (wa.x + wa.width) / dpiScale - winW;
+    const maxY = (wa.y + wa.height) / dpiScale - winH;
+    x = Math.min(Math.max(x, minX), Math.max(minX, maxX));
+    y = Math.min(Math.max(y, minY), Math.max(minY, maxY));
+    pos = { x, y };
+    try {
+      await win.setPosition(new LogicalPosition(Math.round(x), Math.round(y)));
+      if (gen !== guessLayoutGen) return;
+      await win.setSize(new LogicalSize(winW, winH));
+    } catch { /* ignore */ }
+    return;
+  }
+  document.documentElement.classList.remove('guessing');
+  const back = guessLayout;
+  guessLayout = null;
+  try {
+    await win.setSize(new LogicalSize(Math.round(PET_W), Math.round(PET_H)));
+    if (gen !== guessLayoutGen) return;
+    if (back) {
+      pos = { x: back.x, y: back.y };
+      await applyPos();
+    }
+  } catch { /* ignore */ }
+}
+
+function setGuessPose(name) {
+  petEl.classList.remove('guess-sit', 'guess-paw-carrot', 'guess-paw-tissue');
+  if (name) petEl.classList.add(name);
+}
+
+function clearGuessUi() {
+  clearTimeout(guessTimer);
+  guessTimer = null;
+  guessRound = null;
+  guessLayer.classList.remove('show', 'locked');
+  guessLayer.setAttribute('aria-hidden', 'true');
+  guessCarrot.classList.remove('picked');
+  guessTissue.classList.remove('picked');
+  setGuessPose(null);
+  return layoutGuessWindow(false);
+}
+
+function abortGuess() {
+  if (mode !== 'guessing' && !guessRound) return Promise.resolve();
+  const job = clearGuessUi();
+  if (mode === 'guessing') mode = 'ai';
+  return job || Promise.resolve();
+}
+
+function finishGuess() {
+  const was = mode === 'guessing';
+  clearGuessUi();
+  if (was) {
+    mode = 'ai';
+    setAnim('sitWatch');
+    scheduleAI(700);
+  }
+}
+
+function doGuess(preset) {
+  if (mode === 'dragging' || mode === 'eating' || mode === 'playing') return;
+  if (mode === 'guessing') {
+    if (preset) commitGuess(preset);
+    return;
+  }
+  if (mode === 'sleep') mode = 'ai';
+  clearTimeout(aiTimer);
+  mode = 'guessing';
+  guessRound = { secret: Math.random() < 0.5 ? 'carrot' : 'tissue', busy: false };
+  guessCarrot.classList.remove('picked');
+  guessTissue.classList.remove('picked');
+  guessLayer.classList.remove('locked');
+  setGuessPose('guess-sit');
+  layoutGuessWindow(true);
+  guessLayer.classList.add('show');
+  guessLayer.setAttribute('aria-hidden', 'false');
+  clearTimeout(guessTimer);
+  if (preset) guessTimer = setTimeout(() => commitGuess(preset), 700);
+}
+
+function commitGuess(which) {
+  if (mode !== 'guessing' || !guessRound || guessRound.busy) return;
+  if (which !== 'carrot' && which !== 'tissue') return;
+  guessRound.busy = true;
+  clearTimeout(guessTimer);
+  guessCarrot.classList.remove('picked');
+  guessTissue.classList.remove('picked');
+  (which === 'carrot' ? guessCarrot : guessTissue).classList.add('picked');
+  setGuessPose(which === 'carrot' ? 'guess-paw-carrot' : 'guess-paw-tissue');
+  const ok = guessRound.secret === which;
+  guessTimer = setTimeout(() => {
+    if (mode !== 'guessing' || !guessRound) return;
+    if (!ok) {
+      setGuessPose('guess-sit');
+      guessCarrot.classList.remove('picked');
+      guessTissue.classList.remove('picked');
+      guessRound.busy = false;
+      return;
+    }
+    gs.mood = Math.min(100, gs.mood + 8);
+    gainXp(4);
+    bubble('真棒！');
+    const prop = 120 * scale;
+    const inset = 8 * scale;
+    const winW = PET_W + GUESS_SIDE * scale * 2;
+    spawnFx('✨', which === 'carrot' ? winW - inset - prop * 0.5 : inset + prop * 0.5, PET_H + GUESS_BELOW * scale - prop * 0.42);
+    guessTimer = setTimeout(() => {
+      if (mode === 'guessing') finishGuess();
+    }, 1000);
+  }, ok ? 1280 : 620);
+}
+
+guessCarrot.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  commitGuess('carrot');
+});
+guessTissue.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  commitGuess('tissue');
+});
+
 function gainXp(n) {
   if (gs.addXp(n)) {
     spawnFx('🎉', PET_W / 2, PET_H * 0.15);
@@ -343,11 +538,13 @@ function gainXp(n) {
 // 语音气泡：独立窗口渲染，锚定猫头顶（ax=猫中心x, ay=猫顶y, ph=猫高, wa=逻辑工作区）
 function bubble(text, ms) {
   if (!text) return;
+  if (mode === 'guessing' && text !== '真棒！') return;
+  const anchor = petScreenOrigin();
   emitTo('bubble', 'pet://bubble', {
     text,
     ms,
-    ax: Math.round(pos.x + PET_W / 2),
-    ay: Math.round(pos.y),
+    ax: Math.round(anchor.x + PET_W / 2),
+    ay: Math.round(anchor.y),
     ph: Math.round(PET_H),
     wa: {
       x: wa.x / dpiScale,
@@ -358,9 +555,9 @@ function bubble(text, ms) {
   }).catch(() => {});
 }
 
-function spawnFx(char, x, y) {
+function spawnFx(char, x, y, extra = '') {
   const el = document.createElement('div');
-  el.className = 'fx float';
+  el.className = extra ? `fx float ${extra}` : 'fx float';
   el.textContent = char;
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
@@ -372,6 +569,7 @@ function spawnFx(char, x, y) {
 async function setScale(idx) {
   idx = Math.max(0, Math.min(SCALES.length - 1, idx));
   if (idx === scaleIdx) return;
+  await abortGuess();
   await syncPosFromWindow();
   const oldW = PET_W, oldH = PET_H;
   scaleIdx = idx;
@@ -399,15 +597,23 @@ async function openMenuWindow(e) {
   menuOpen = true;
   const autostart = await invoke('is_autostart').catch(() => false);
   const statsVisible = statsWin ? await statsWin.isVisible().catch(() => false) : false;
+  await syncPosFromWindow();
   emitTo('menu', 'pet://menu-open', { autostart, statsVisible }).catch(() => {});
-  // 等菜单自撑高度后定位显示（按展开子菜单后的最大宽度预留，避免右侧出屏）
-  await new Promise((r) => setTimeout(r, 70));
-  let mx = pos.x + e.clientX, my = pos.y + e.clientY;
+  await new Promise((r) => setTimeout(r, 80));
   const ms = await menuWin.outerSize().catch(() => null);
-  const mw = Math.max(ms ? ms.width / dpiScale : 210, 350);
-  const mh = Math.max(ms ? ms.height / dpiScale : 400, 420);
-  mx = Math.min(Math.max(mx, wa.x / dpiScale), (wa.x + wa.width) / dpiScale - mw);
-  my = Math.min(Math.max(my, wa.y / dpiScale), (wa.y + wa.height) / dpiScale - mh);
+  const scale = dpiScale || 1;
+  const mw = ms ? ms.width / scale : 230;
+  const mh = ms ? ms.height / scale : 420;
+  const left = wa.x / scale + 4;
+  const top = wa.y / scale + 4;
+  const right = (wa.x + wa.width) / scale - 4;
+  const bottom = (wa.y + wa.height) / scale - 4;
+  let mx = pos.x + e.clientX;
+  let my = pos.y + e.clientY;
+  if (mx + mw > right) mx = pos.x - mw - 4;
+  if (my + mh > bottom) my = pos.y + PET_H - mh;
+  mx = Math.min(Math.max(mx, left), Math.max(left, right - mw));
+  my = Math.min(Math.max(my, top), Math.max(top, bottom - mh));
   try {
     await menuWin.setPosition(new LogicalPosition(Math.round(mx), Math.round(my)));
     await menuWin.show();
@@ -422,6 +628,7 @@ listen('pet://menu-action', (e) => {
 function handleAction(action) {
   if (!action) return;
   if (action.startsWith('anim:')) {
+    if (mode === 'guessing') abortGuess();
     const key = action.slice(5);
     if (!ANIMS[key]) return;
     clearTimeout(aiTimer);
@@ -435,6 +642,7 @@ function handleAction(action) {
   switch (action) {
     case 'feed': doFeed(); break;
     case 'play': doPlay(); break;
+    case 'guess': doGuess(); break;
     case 'sleep': mode === 'sleep' ? wake() : startSleep(false); break;
     case 'chat': openChat(); break;
     case 'toggle-stats':
@@ -500,6 +708,14 @@ listen('pet://chat-send', (e) => {
   if (!text) return;
   gs.mood = Math.min(100, gs.mood + 1);
   gainXp(1);
+
+  if (mode === 'guessing' && guessRound && !guessRound.busy) {
+    if (/纸巾/.test(text) && !/萝卜|胡萝卜/.test(text)) { commitGuess('tissue'); return; }
+    if (/萝卜|胡萝卜/.test(text) && !/纸巾/.test(text)) { commitGuess('carrot'); return; }
+  }
+  if (/猜(一下)?(萝卜|胡萝卜)/.test(text)) { doGuess('carrot'); return; }
+  if (/猜(一下)?纸巾/.test(text)) { doGuess('tissue'); return; }
+  if (/猜一猜|来猜|猜猜/.test(text)) { doGuess(); return; }
 
   if (/睡觉|休息吧|去睡/.test(text) && mode !== 'sleep') return reply('好喵，我先睡会儿 Zzz'), startSleep(false);
   if (/起床|醒来|别睡/.test(text)) { wake(); return reply('喵呜~ 醒了！'); }
@@ -642,6 +858,11 @@ document.addEventListener('contextmenu', (e) => {
     }
   }
   if (changed) saveReminders();
+
+  for (const src of ['/src/assets/guess-sit.png', '/src/assets/guess-paw-carrot.png', '/src/assets/guess-paw-tissue.png']) {
+    const img = new Image();
+    img.src = src;
+  }
 
   if (gs.hunger < 20) bubble('好饿…');
   mode = 'ai';

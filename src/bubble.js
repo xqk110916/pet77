@@ -13,12 +13,14 @@ listen('pet://bubble', async (e) => {
   const { text, ms, ax, ay, ph, wa } = e.payload || {};
   if (!text) return;
 
-  // 先按内容测量自然尺寸
+  // 先把窗口撑开再量文字，避免沿用上一次的窄宽度把句子折成很多行
   box.classList.remove('show');
   box.textContent = text;
+  try { await win.setSize(new LogicalSize(520, 180)); } catch { /* ignore */ }
+  await new Promise((r) => requestAnimationFrame(r));
   const rect = box.getBoundingClientRect();
-  const w = Math.min(330, Math.ceil(rect.width) + 24 + 2);
-  const h = Math.ceil(rect.height) + 12 + 14; // 内边距 + 尾巴空间
+  const w = Math.min(520, Math.max(120, Math.ceil(rect.width) + 28));
+  const h = Math.max(48, Math.ceil(rect.height) + 28);
   try {
     await win.setSize(new LogicalSize(w, h));
   } catch { /* ignore */ }
