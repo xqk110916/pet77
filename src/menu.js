@@ -26,6 +26,7 @@ async function resizeToContent() {
   const w = Math.ceil(Math.max(panel.scrollWidth, panel.offsetWidth)) + 16;
   const h = Math.ceil(Math.max(panel.scrollHeight, panel.offsetHeight)) + 16;
   try { await win.setSize(new LogicalSize(w, h)); } catch { /* ignore */ }
+  return { w, h };
 }
 
 function setFlyout(open) {
@@ -51,12 +52,14 @@ animEntry.addEventListener('mouseenter', () => setFlyout(true));
 panel.addEventListener('mouseleave', () => { setFlyout(false); armHide(); });
 panel.addEventListener('pointermove', armHide);
 
-listen('pet://menu-open', (e) => {
+listen('pet://menu-open', async (e) => {
   const { autostart, statsVisible } = e.payload || {};
   document.getElementById('chk-autostart').textContent = autostart ? '✔' : '◻';
   document.getElementById('chk-stats').textContent = statsVisible ? '✔' : '◻';
-  setFlyout(false);
-  resizeToContent();
+  flyoutOpen = false;
+  flyout.style.display = 'none';
+  const size = await resizeToContent();
+  emitTo('main', 'pet://menu-sized', size).catch(() => {});
   armHide();
 });
 

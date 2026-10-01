@@ -41,9 +41,33 @@ fn window_work_area(window: &WebviewWindow<Wry>) -> Option<WorkArea> {
     work_area_at(pos.x + size.width as i32 / 2, pos.y + size.height as i32 / 2)
 }
 
+#[derive(Serialize, Clone, Copy)]
+struct ScreenPoint {
+    x: i32,
+    y: i32,
+}
+
 #[tauri::command]
 fn get_work_area(window: WebviewWindow<Wry>) -> Result<WorkArea, String> {
     window_work_area(&window).ok_or_else(|| "无法获取工作区".into())
+}
+
+/// 鼠标的物理屏幕坐标。右键菜单用它做锚点，避免拖动后窗口位置读数短暂变成左上角。
+#[tauri::command]
+fn cursor_pos() -> Result<ScreenPoint, String> {
+    unsafe {
+        let mut pt: POINT = std::mem::zeroed();
+        if winapi::um::winuser::GetCursorPos(&mut pt) == 0 {
+            return Err("无法读取鼠标位置".into());
+        }
+        Ok(ScreenPoint { x: pt.x, y: pt.y })
+    }
+}
+
+/// 某个物理坐标所在显示器的工作区（已去掉任务栏）。
+#[tauri::command]
+fn work_area_at_point(x: i32, y: i32) -> Result<WorkArea, String> {
+    work_area_at(x, y).ok_or_else(|| "无法获取工作区".into())
 }
 
 // ---------- 状态持久化 ----------
@@ -274,6 +298,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_work_area,
+            cursor_pos,
+            work_area_at_point,
             save_state,
             load_state,
             toggle_autostart,

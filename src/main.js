@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { LogicalPosition, LogicalSize } from '@tauri-apps/api/dpi';
+import { LogicalPosition, LogicalSize, PhysicalPosition } from '@tauri-apps/api/dpi';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { ANIMS, FRAME_W, FRAME_H, SCALES, SPEED_MUL } from './animations.js';
 import { GameState } from './game-state.js';
@@ -139,11 +139,7 @@ function decideNext() {
   }
 
   // 安静模式：只在原地小动作，不自主跑动（跑动仅通过动作演示/拖拽触发）
-  const r = Math.random();
-  if (r < 0.42) return idleAction('doze', 5000 + Math.random() * 4000);
-  if (r < 0.68) return idleAction('happy', 4000 + Math.random() * 3000);
-  if (r < 0.86) return idleAction('wink', 3500 + Math.random() * 2500);
-  idleAction('sitWatch', 4000 + Math.random() * 3000);
+  idleAction('doze', 8000 + Math.random() * 4000);
 }
 
 function idleAction(name, ms) {
@@ -206,26 +202,25 @@ petEl.addEventListener('pointerdown', (e) => {
     sx: e.screenX,
     sy: e.screenY,
     dragging: false,
-    timer: null,
     xRatio: rect.width ? (e.clientX - rect.left) / rect.width : 0.5,
     yRatio: rect.height ? (e.clientY - rect.top) / rect.height : 1,
   };
-  press.timer = setTimeout(startDrag, 170);
 });
+
+// 小于这个位移算点击。过小会把普通点击当成拖动，小猫切到侧身跑。
+const DRAG_SLOP = 16;
 
 document.addEventListener('pointermove', (e) => {
   if (!press || press.dragging) return;
-  if (Math.hypot(e.screenX - press.sx, e.screenY - press.sy) > 6) {
-    clearTimeout(press.timer);
+  if (Math.hypot(e.screenX - press.sx, e.screenY - press.sy) > DRAG_SLOP) {
     startDrag();
   }
 });
 
 document.addEventListener('pointerup', () => {
   if (!press) return;
-  clearTimeout(press.timer);
   if (!press.dragging) {
-    if (performance.now() - press.t < 400) onPetClick();
+    onPetClick();
     press = null;
   }
   // 拖拽中不清理 press，交给 pollDragEnd 检测系统拖拽结束后落地
@@ -310,7 +305,7 @@ function onPetClick() {
   if (onBody) {
     setAnim('happy', 1, () => scheduleAI(700));
     spawnFx('♥', PET_W * (press?.xRatio ?? 0.5), PET_H * Math.min(press?.yRatio ?? 0.7, 0.82), 'heart');
-    bubble('爱你，小咪');
+    bubble('爱你呦,主人');
   } else {
     setAnim('wink', 1, () => scheduleAI(700));
     spawnFx('♥', PET_W / 2, PET_H * 0.25);
@@ -590,32 +585,95 @@ async function setScale(idx) {
 
 // ---------------- 菜单窗口 ----------------
 let menuOpen = false;
+let menuSizedResolve = null;
+
+listen('pet://menu-sized', (ev) => {
+  const resolve = menuSizedResolve;
+  menuSizedResolve = null;
+  if (resolve) resolve(ev.payload || null);
+});
+
+function nextMenuSize() {
+  menuSizedResolve?.(null);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (menuSizedResolve !== wrapped) return;
+      menuSizedResolve = null;
+      resolve(null);
+    }, 240);
+    const wrapped = (payload) => {
+      clearTimeout(timer);
+      resolve(payload);
+    };
+    menuSizedResolve = wrapped;
+  });
+}
 
 async function openMenuWindow(e) {
   if (!menuWin) return;
   menuOpen = true;
   const autostart = await invoke('is_autostart').catch(() => false);
   const statsVisible = statsWin ? await statsWin.isVisible().catch(() => false) : false;
-  await syncPosFromWindow();
+
+  // 用鼠标的物理坐标当锚点。拖动刚结束时，窗口自己报的位置有时会变成 (0,0)，
+  // 再拿去换算逻辑坐标，菜单就会被夹到屏幕最左边。
+  const cursor = await invoke('cursor_pos').catch(() => null);
+  const origin = await win.outerPosition().catch(() => null);
+  const scale = await win.scaleFactor().catch(() => dpiScale || 1);
+  dpiScale = scale || 1;
+
+  let anchorX;
+  let anchorY;
+  if (cursor && Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) {
+    anchorX = cursor.x;
+    anchorY = cursor.y;
+  } else if (origin) {
+    anchorX = origin.x + e.clientX * dpiScale;
+    anchorY = origin.y + e.clientY * dpiScale;
+  } else {
+    anchorX = (pos.x + e.clientX) * dpiScale;
+    anchorY = (pos.y + e.clientY) * dpiScale;
+  }
+
+  const area = await invoke('work_area_at_point', {
+    x: Math.round(anchorX),
+    y: Math.round(anchorY),
+  }).catch(() => null);
+  if (area?.width) wa = area;
+
+  const sizedPromise = nextMenuSize();
   emitTo('menu', 'pet://menu-open', { autostart, statsVisible }).catch(() => {});
-  await new Promise((r) => setTimeout(r, 80));
+  await sizedPromise;
+
   const ms = await menuWin.outerSize().catch(() => null);
-  const scale = dpiScale || 1;
-  const mw = ms ? ms.width / scale : 230;
-  const mh = ms ? ms.height / scale : 420;
-  const left = wa.x / scale + 4;
-  const top = wa.y / scale + 4;
-  const right = (wa.x + wa.width) / scale - 4;
-  const bottom = (wa.y + wa.height) / scale - 4;
-  let mx = pos.x + e.clientX;
-  let my = pos.y + e.clientY;
-  if (mx + mw > right) mx = pos.x - mw - 4;
-  if (my + mh > bottom) my = pos.y + PET_H - mh;
+  const bounds = area?.width ? area : wa;
+  let mw = ms?.width || Math.round(230 * dpiScale);
+  let mh = ms?.height || Math.round(420 * dpiScale);
+  const maxW = Math.max(80, bounds.width - 16);
+  const maxH = Math.max(80, bounds.height - 16);
+  // 尺寸偶发读成整屏时，不要据此把菜单甩到工作区左边缘
+  if (mw > maxW) mw = Math.min(mw, Math.round(230 * dpiScale));
+  if (mh > maxH) mh = Math.min(mh, maxH);
+
+  const margin = 8;
+  const left = bounds.x + margin;
+  const top = bounds.y + margin;
+  const right = bounds.x + bounds.width - margin;
+  const bottom = bounds.y + bounds.height - margin;
+  let mx = anchorX;
+  let my = anchorY;
+  if (mx + mw > right) mx = anchorX - mw;
+  if (my + mh > bottom) my = anchorY - mh;
   mx = Math.min(Math.max(mx, left), Math.max(left, right - mw));
   my = Math.min(Math.max(my, top), Math.max(top, bottom - mh));
+
+  const target = new PhysicalPosition(Math.round(mx), Math.round(my));
   try {
-    await menuWin.setPosition(new LogicalPosition(Math.round(mx), Math.round(my)));
+    await menuWin.hide().catch(() => {});
+    await menuWin.setPosition(target);
     await menuWin.show();
+    // 窗口还藏着的时候，第一次 setPosition 有时不生效，露出来会停在上次的左上角
+    await menuWin.setPosition(target);
   } catch { /* ignore */ }
 }
 

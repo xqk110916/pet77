@@ -13,7 +13,7 @@ export const SCALES = [0.5, 0.75, 1, 1.5, 2];
 export const SPEED_MUL = 0.42;
 
 export const ANIMS = {
-  doze:     { row: 0, frames: 6, fps: 5,  loop: true,  label: '眨眼' },
+  doze:     { row: 0, frames: 8, fps: 8,  loop: true,  label: '端坐' },
   walkRight:{ row: 1, frames: 8, fps: 10, loop: true,  label: '向右跑' },
   walkLeft: { row: 2, frames: 8, fps: 10, loop: true,  label: '向左跑' },
   sitWatch: { row: 8, frames: 6, fps: 6,  loop: true,  label: '端详' },
