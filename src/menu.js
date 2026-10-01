@@ -9,7 +9,7 @@ const panel = document.getElementById('menu-panel');
 const animEntry = document.getElementById('anim-entry');
 const flyout = document.getElementById('flyout');
 
-const ON_MAIN_MENU = new Set(['sleepLie', 'belly', 'stretch', 'tailChase', 'drink']);
+const ON_MAIN_MENU = new Set(['sleepLie', 'belly', 'stretch', 'tailChase', 'drink', 'happy', 'wink']);
 
 for (const [key, def] of Object.entries(ANIMS)) {
   if (ON_MAIN_MENU.has(key)) continue;

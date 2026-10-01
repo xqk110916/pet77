@@ -140,10 +140,10 @@ function decideNext() {
 
   // 安静模式：只在原地小动作，不自主跑动（跑动仅通过动作演示/拖拽触发）
   const r = Math.random();
-  if (r < 0.40) return idleAction('sitWatch', 4000 + Math.random() * 4000);
-  if (r < 0.65) return idleAction('curious', 3000 + Math.random() * 3000);
-  if (r < 0.85) return idleAction('swipe', 3000 + Math.random() * 3000);
-  idleAction('doze', 5000 + Math.random() * 4000);
+  if (r < 0.42) return idleAction('doze', 5000 + Math.random() * 4000);
+  if (r < 0.68) return idleAction('happy', 4000 + Math.random() * 3000);
+  if (r < 0.86) return idleAction('wink', 3500 + Math.random() * 2500);
+  idleAction('sitWatch', 4000 + Math.random() * 3000);
 }
 
 function idleAction(name, ms) {
@@ -308,11 +308,11 @@ function onPetClick() {
   mode = 'ai';
   const onBody = (press?.yRatio ?? 1) >= 0.5;
   if (onBody) {
-    setAnim('sitWatch', 1, () => scheduleAI(700));
+    setAnim('happy', 1, () => scheduleAI(700));
     spawnFx('♥', PET_W * (press?.xRatio ?? 0.5), PET_H * Math.min(press?.yRatio ?? 0.7, 0.82), 'heart');
     bubble('爱你，小咪');
   } else {
-    setAnim('alert', 1, () => scheduleAI(700));
+    setAnim('wink', 1, () => scheduleAI(700));
     spawnFx('♥', PET_W / 2, PET_H * 0.25);
     bubble(PET_WORDS[(Math.random() * PET_WORDS.length) | 0]);
   }
