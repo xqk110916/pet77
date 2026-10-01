@@ -1,6 +1,6 @@
 [package]
 name = "pet77"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pet77 Windows 桌宠"
 edition = "2021"
 

@@ -23,7 +23,7 @@ html, body, #app {
   bottom: 0;
   width: calc(192px * var(--scale));
   height: calc(208px * var(--scale));
-  background-image: url('/src/assets/spritesheet.webp?v=4');
+  background-image: url('/src/assets/spritesheet.webp?v=5');
   background-repeat: no-repeat;
   background-size: calc(1536px * var(--scale)) calc(3328px * var(--scale));
   background-position: calc(0px - var(--col, 0) * 192px * var(--scale)) calc(0px - var(--row, 0) * 208px * var(--scale));

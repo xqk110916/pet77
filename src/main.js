@@ -332,8 +332,7 @@ function doFeed() {
   clearTimeout(aiTimer);
   mode = 'eating';
   cooldown.feed = Date.now() + 5000;
-  const foods = ['🍗', '🐟', '🥛'];
-  foodEl.textContent = foods[(Math.random() * foods.length) | 0];
+  foodEl.textContent = '🐟';
   foodEl.classList.add('show');
   setAnim('eat', 20, () => {
     foodEl.classList.remove('show');

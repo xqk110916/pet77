@@ -16,7 +16,7 @@ export const ANIMS = {
   walkRight:{ row: 1, frames: 8, fps: 10, loop: true,  label: '向右跑' },
   walkLeft: { row: 2, frames: 8, fps: 10, loop: true,  label: '向左跑' },
   sitWatch: { row: 8, frames: 6, fps: 6,  loop: true,  label: '端详' },
-  eat:      { row: 7, frames: 6, fps: 8,  loop: true,  label: '忙活' },
+  eat:      { row: 7, frames: 6, fps: 8,  loop: true,  label: '吃鱼' },
   pounce:   { row: 4, frames: 5, fps: 9,  loop: false, label: '蹦跳' },
   alert:    { row: 5, frames: 8, fps: 8,  loop: false, label: '委屈' },
   swipe:    { row: 3, frames: 4, fps: 7,  loop: true,  label: '挥手' },
